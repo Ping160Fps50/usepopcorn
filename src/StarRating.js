@@ -17,7 +17,7 @@ StarRating.propTypes = {
   size: PropTypes.number,
   messages: PropTypes.array,
   defaultRating: PropTypes.number,
-  // onSetRating: PropTypes.func,
+  onSetRating: PropTypes.func,
 };
 
 export default function StarRating({
@@ -38,7 +38,7 @@ export default function StarRating({
   };
   function handleRating(rate) {
     setRating(rate);
-    // onSetRating(rate);
+    onSetRating(rate);
   }
   return (
     <div style={containerStyle}>
