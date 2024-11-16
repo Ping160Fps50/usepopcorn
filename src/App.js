@@ -54,7 +54,7 @@ const average = (arr) =>
 const KEY = "ed4427fc";
 
 export default function App() {
-  const [query, setQuery] = useState("inception");
+  const [query, setQuery] = useState("");
   const [movies, setMovies] = useState([]);
   const [watched, setWatched] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,36 +79,42 @@ export default function App() {
   function handleDeleteWatched(id) {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   }
-  useEffect(
-    function () {
-      async function fetchMovies() {
-        try {
-          setIsLoading(true);
-          setError("");
-          const res = await fetch(
-            ` http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
-          );
-          if (!res.ok) throw new Error("Somthing Went Wrong!!!");
-          const data = await res.json();
-          if (data.Response === "False") throw new Error("Movie Not Found");
-          setMovies(data.Search);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-
-      if (query.length < 3) {
-        setMovies([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function fetchMovies() {
+      try {
+        setIsLoading(true);
         setError("");
-        return;
+        const res = await fetch(
+          ` http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) throw new Error("Somthing Went Wrong!!!");
+        const data = await res.json();
+        if (data.Response === "False") throw new Error("Movie Not Found");
+        setMovies(data.Search);
+        setError("");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      } finally {
+        setIsLoading(false);
       }
+    }
 
-      fetchMovies();
-    },
-    [query]
-  );
+    if (query.length < 3) {
+      setMovies([]);
+      setError("");
+      return;
+    }
+    handleCloseMovie();
+    fetchMovies();
+
+    return function () {
+      controller.abort();
+    };
+  }, [query]);
   return (
     <>
       <NavBar>
@@ -245,7 +251,7 @@ function MovieDetails({
 }) {
   const [movie, setMovie] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setIsError] = useState("");
+  const [error, setError] = useState("");
   const [userRating, setUserRating] = useState(0);
   const isWatched = watched.map((movie) => movie.imdbID).includes(selectedId);
   const WatchedUserRating = watched.find(
@@ -284,7 +290,7 @@ function MovieDetails({
     async function getMovieDetail() {
       try {
         setIsLoading(true);
-        setIsError("");
+        setError("");
         const res = await fetch(
           ` http://www.omdbapi.com/?apikey=${KEY}&i=${selectedId}`
         );
@@ -292,19 +298,31 @@ function MovieDetails({
         const data = await res.json();
         if (data.Response === "False") throw new Error("Movie Is Not Valid");
         setMovie(data);
-      } catch (err) {
-        setIsError(err.message);
-      } finally {
         setIsLoading(false);
+      } catch (err) {
+        setError(err.message);
       }
-    }
-    if (!selectedId) {
-      setMovie({});
-      setIsError("");
-      return;
     }
     getMovieDetail();
   }, [selectedId]);
+  useEffect(() => {
+    document.title = `Movie | ${title ? title : "Loading..."}`;
+    return function () {
+      document.title = "Use Popcorn";
+    };
+  }, [title]);
+  useEffect(() => {
+    function keyDown(e) {
+      if (e.code === "Escape") {
+        onCloseMovie();
+      }
+    }
+    document.addEventListener("keydown", keyDown);
+
+    return function () {
+      document.removeEventListener("keydown", keyDown);
+    };
+  }, [onCloseMovie]);
   return (
     <div className="details">
       {isLoading && !error && <Loader />}
